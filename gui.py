@@ -163,11 +163,14 @@ class LDFGui:
         self.var_png = tk.BooleanVar(value=True)
         self.var_svg = tk.BooleanVar(value=True)
         self.var_excel = tk.BooleanVar(value=True)
+        self.var_octagon = tk.BooleanVar(value=True)
         tk.Checkbutton(opt_row2, text="生成 PNG 图片", variable=self.var_png,
                        font=("Microsoft YaHei", 9), bg=BG).pack(side="left", padx=(0, 12))
         tk.Checkbutton(opt_row2, text="生成 SVG 图片", variable=self.var_svg,
                        font=("Microsoft YaHei", 9), bg=BG).pack(side="left", padx=(0, 12))
         tk.Checkbutton(opt_row2, text="生成 Excel", variable=self.var_excel,
+                       font=("Microsoft YaHei", 9), bg=BG).pack(side="left", padx=(0, 12))
+        tk.Checkbutton(opt_row2, text="八边形布局（8边=8字节）", variable=self.var_octagon,
                        font=("Microsoft YaHei", 9), bg=BG).pack(side="left", padx=(0, 12))
 
         # 生成按钮
@@ -372,6 +375,15 @@ class LDFGui:
                         annotations=ann or None)
                     for s in saved:
                         self._log(f"Saved: {s}")
+
+                    # 八边形布局（独立勾选）
+                    if self.var_octagon.get():
+                        saved = parse.plot_single_frame_octagon(
+                            self.ldf, fname, outdir,
+                            save_png=self.var_png.get(), save_svg=self.var_svg.get(),
+                            annotations=ann or None)
+                        for s in saved:
+                            self._log(f"Saved: {s}")
 
                 # 2. 多帧总览图（仅勾选帧）
                 saved = parse.plot_all_frames(

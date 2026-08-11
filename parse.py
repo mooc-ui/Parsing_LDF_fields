@@ -8,9 +8,11 @@ LIN LDF Signal Mapping Visualizer
 
 import ldfparser
 import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
+from matplotlib.patches import Rectangle, Polygon, PathPatch, Circle
+from matplotlib.path import Path
 from matplotlib.colors import LinearSegmentedColormap
 import os
+import math
 import textwrap
 
 # ==================== 中文字体配置 ====================
@@ -162,6 +164,240 @@ def plot_single_frame(ldf, frame_name, output_dir=OUTPUT_DIR, save_png=True, sav
         saved.append(png_path)
     if save_svg:
         svg_path = f"{output_dir}/{frame_name}_signal_mapping.svg"
+        plt.savefig(svg_path, format="svg", bbox_inches="tight", facecolor="white")
+        saved.append(svg_path)
+    plt.close()
+    return saved
+
+
+# ==================== 八边形布局 ====================
+def _octagon_geometry():
+    """正八边形几何：顶点(8个)与字节边定义(byte b -> (起点顶点, 终点顶点))
+    顶点 k 角度 = 67.5° + 45°*k；byte0=顶边(左→右)，顺时针排列"""
+    R = 1.0
+    verts = []
+    for k in range(8):
+        ang = math.radians(67.5 + 45 * k)
+        verts.append((R * math.cos(ang), R * math.sin(ang)))
+    byte_edges = [(1, 0), (0, 7), (7, 6), (6, 5), (5, 4), (4, 3), (3, 2), (2, 1)]
+    return verts, byte_edges
+
+
+def _octagon_edge_point(verts, byte_edges, b, t):
+    """字节边 b 上参数 t (0~1) 处的坐标（t=0 起点顶点, t=1 终点顶点）"""
+    ks, ke = byte_edges[b]
+    x0, y0 = verts[ks]
+    x1, y1 = verts[ke]
+    return (x0 + (x1 - x0) * t, y0 + (y1 - y0) * t)
+
+
+def _octagon_outward(verts, byte_edges, b):
+    """字节边 b 的外法向（单位向量），正八边形边中点径向即外法向"""
+    mx, my = _octagon_edge_point(verts, byte_edges, b, 0.5)
+    L = math.hypot(mx, my)
+    return (mx / L, my / L)
+
+
+def _octagon_block_quad(verts, byte_edges, b, t0, t1, off, width):
+    """信号块四边形：字节边 b 上 [t0,t1] 段，沿外法向偏移 off~off+width"""
+    p0 = _octagon_edge_point(verts, byte_edges, b, t0)
+    p1 = _octagon_edge_point(verts, byte_edges, b, t1)
+    nx, ny = _octagon_outward(verts, byte_edges, b)
+    return [(p0[0] + nx * off, p0[1] + ny * off),
+            (p1[0] + nx * off, p1[1] + ny * off),
+            (p1[0] + nx * (off + width), p1[1] + ny * (off + width)),
+            (p0[0] + nx * (off + width), p0[1] + ny * (off + width))]
+
+
+def _split_byte_segments(sig):
+    """把信号拆成按字节分段的 [(byte, j0, j1)]，j0/j1 为该字节内 bit 序号(含两端)"""
+    segs = []
+    s, e = sig["start"], sig["end"]
+    for b in range(s // 8, e // 8 + 1):
+        j0 = s if b == s // 8 else b * 8
+        j1 = e if b == e // 8 else b * 8 + 7
+        segs.append((b, j0 - b * 8, j1 - b * 8))
+    return segs
+
+
+def plot_single_frame_octagon(ldf, frame_name, output_dir=OUTPUT_DIR, save_png=True, save_svg=True,
+                              dpi=300, annotations=None):
+    """绘制八边形布局单帧图（8条边=8字节，每条边8 bit，中心区帧信息）
+
+    规则：
+    - 字节按顺时针排列，byte0 顶边左→右，bit0 为该边最左端
+    - 帧长 < 8 字节时，空余边以虚线 + "Reserved" 标记
+    - 跨字节信号拆分为多段分别绘于各字节边，段间用弧线连接
+    - 注释以引线+文本框绘制在八边形外侧（沿信号径向）
+    """
+    from matplotlib.patches import FancyArrowPatch
+
+    frame = ldf.get_unconditional_frame(frame_name)
+    signals = get_signals(frame)
+    total_bits = frame.length * 8
+    n_bytes = frame.length
+
+    verts, byte_edges = _octagon_geometry()
+
+    # 颜色渐变（与线性布局一致）
+    colors = ["#f0e68c", "#c5e1a5", "#81c784", "#4db6ac", "#26a69a",
+              "#00897b", "#00695c", "#004d40", "#1a237e", "#0d47a1", "#ffcc80"]
+    cmap = LinearSegmentedColormap.from_list("custom", colors, N=len(signals))
+
+    # 收集注释
+    ann_items = []
+    if annotations:
+        for sig in signals:
+            text = (annotations.get(sig["name"]) or "").strip()
+            if text:
+                ann_items.append((sig, text))
+
+    # 区块偏移参数（半径单位）
+    OFF, W = 0.07, 0.16   # 信号块外偏移与宽度
+    LABEL_R = OFF + W + 0.10   # 字节/Reserved 标签半径
+
+    fig, ax = plt.subplots(figsize=(9, 9))
+    ax.set_facecolor("#fafafa")
+    ax.set_aspect("equal")
+
+    # 八边形外轮廓（浅灰填充）
+    poly = Polygon(verts, closed=True, facecolor="#f2f4f7", edgecolor="#555",
+                   linewidth=1.2, zorder=1)
+    ax.add_patch(poly)
+
+    # 每条边的 bit 刻度（1~7 分隔线）与字节标签
+    for b in range(8):
+        nx, ny = _octagon_outward(verts, byte_edges, b)
+        if b >= n_bytes:
+            # Reserved 边：虚线 + 标签
+            p0 = _octagon_edge_point(verts, byte_edges, b, 0.0)
+            p1 = _octagon_edge_point(verts, byte_edges, b, 1.0)
+            ax.plot([p0[0], p1[0]], [p0[1], p1[1]], color="#bbb", lw=1.0,
+                    linestyle=(0, (4, 3)), zorder=2)
+            mx, my = _octagon_edge_point(verts, byte_edges, b, 0.5)
+            ax.text(mx + nx * LABEL_R, my + ny * LABEL_R, "Reserved",
+                    ha="center", va="center", fontsize=6.5, color="#999",
+                    fontstyle="italic", zorder=6)
+            continue
+        for j in range(1, 8):
+            px, py = _octagon_edge_point(verts, byte_edges, b, j / 8)
+            ax.plot([px + nx * (OFF - 0.02), px + nx * (OFF + W + 0.02)],
+                    [py + ny * (OFF - 0.02), py + ny * (OFF + W + 0.02)],
+                    color="#666", lw=0.6, zorder=3)
+        # 字节标签
+        mx, my = _octagon_edge_point(verts, byte_edges, b, 0.5)
+        ax.text(mx + nx * LABEL_R, my + ny * LABEL_R,
+                f"B{b} [{b * 8}-{b * 8 + 7}]", ha="center", va="center",
+                fontsize=7.5, fontweight="bold", color="#333", zorder=6,
+                bbox=dict(boxstyle="round,pad=0.18", facecolor="white",
+                          edgecolor="#aaa", lw=0.5))
+
+    # 绘制信号块（按字节分段）
+    drawn = {}   # byte -> list[(t0, t1, color)] 用于跨字节连接
+    for i, sig in enumerate(signals):
+        color = cmap(i / max(len(signals) - 1, 1))
+        segs = _split_byte_segments(sig)
+        for idx, (b, j0, j1) in enumerate(segs):
+            t0, t1 = j0 / 8, (j1 + 1) / 8
+            quad = _octagon_block_quad(verts, byte_edges, b, t0, t1, OFF, W)
+            ax.add_patch(Polygon(quad, closed=True, facecolor=color,
+                                 edgecolor="#222", linewidth=0.6, alpha=0.92, zorder=4))
+            drawn.setdefault(b, []).append((t0, t1, color))
+            # 段内 bit 分隔
+            for j in range(j0 + 1, j1 + 1):
+                px, py = _octagon_edge_point(verts, byte_edges, b, j / 8)
+                nx, ny = _octagon_outward(verts, byte_edges, b)
+                ax.plot([px + nx * OFF, px + nx * (OFF + W)],
+                        [py + ny * OFF, py + ny * (OFF + W)],
+                        color="#222", lw=0.3, alpha=0.55, zorder=5)
+            # 信号名（放在第一段中心，沿边方向旋转）
+            if idx == 0:
+                cmid = (t0 + t1) / 2
+                mx, my = _octagon_edge_point(verts, byte_edges, b, cmid)
+                nx, ny = _octagon_outward(verts, byte_edges, b)
+                ks, ke = byte_edges[b]
+                dx = verts[ke][0] - verts[ks][0]
+                dy = verts[ke][1] - verts[ks][1]
+                ang = math.degrees(math.atan2(dy, dx))
+                if ang > 90 or ang < -90:
+                    ang += 180
+                ax.text(mx + nx * (OFF + W / 2), my + ny * (OFF + W / 2),
+                        sig["name"], ha="center", va="center", rotation=ang,
+                        fontsize=6, fontweight="bold", color="#111", zorder=6)
+
+    # 跨字节信号：段间弧线连接（在共享顶点外侧弯出）
+    for i, sig in enumerate(signals):
+        segs = _split_byte_segments(sig)
+        if len(segs) < 2:
+            continue
+        color = cmap(i / max(len(signals) - 1, 1))
+        for idx in range(len(segs) - 1):
+            b1, j1a, j1b = segs[idx]
+            b2, j2a, j2b = segs[idx + 1]
+            p1 = _octagon_edge_point(verts, byte_edges, b1, (j1b + 1) / 8)
+            p2 = _octagon_edge_point(verts, byte_edges, b2, j2a / 8)
+            nx1, ny1 = _octagon_outward(verts, byte_edges, b1)
+            nx2, ny2 = _octagon_outward(verts, byte_edges, b2)
+            A = (p1[0] + nx1 * OFF, p1[1] + ny1 * OFF)
+            B = (p2[0] + nx2 * OFF, p2[1] + ny2 * OFF)
+            arc = FancyArrowPatch(A, B, arrowstyle="-", color=color, lw=1.8,
+                                  connectionstyle="arc3,rad=-0.45",
+                                  shrinkA=0, shrinkB=0, zorder=5)
+            ax.add_patch(arc)
+
+    # 中心区帧信息
+    center = Circle((0, 0), 0.52, facecolor="white", edgecolor="#555",
+                    linewidth=1.0, zorder=7)
+    ax.add_patch(center)
+    ax.text(0, 0.16, frame.name, ha="center", va="center", fontsize=10,
+            fontweight="bold", color="#111", zorder=8)
+    ax.text(0, -0.02, f"ID: {frame.frame_id}", ha="center", va="center",
+            fontsize=7.5, color="#333", zorder=8)
+    ax.text(0, -0.18, f"{n_bytes} B / {total_bits} bit", ha="center", va="center",
+            fontsize=7.5, color="#555", zorder=8)
+
+    # 注释：引线 + 外圈文本框
+    for k, (sig, text) in enumerate(ann_items):
+        segs = _split_byte_segments(sig)
+        b, j0, j1 = segs[0]
+        t0, t1 = j0 / 8, (j1 + 1) / 8
+        cmid = (t0 + t1) / 2
+        mx, my = _octagon_edge_point(verts, byte_edges, b, cmid)
+        nx, ny = _octagon_outward(verts, byte_edges, b)
+        anchor = (mx + nx * (OFF + W), my + ny * (OFF + W))
+        L = math.hypot(anchor[0], anchor[1])
+        ux, uy = anchor[0] / L, anchor[1] / L
+        box_pos = (anchor[0] + ux * (0.5 + k * 0.30), anchor[1] + uy * (0.5 + k * 0.30))
+        # 引线
+        ax.plot([anchor[0], box_pos[0]], [anchor[1], box_pos[1]],
+                color="#c0392b", lw=0.9, zorder=6)
+        wrap_w = 22 if any('\u4e00' <= ch <= '\u9fff' for ch in text) else 40
+        wrapped = "\n".join(textwrap.wrap(text, wrap_w)) or text
+        ax.text(box_pos[0], box_pos[1], wrapped, ha="center", va="center",
+                fontsize=7, color="#222", zorder=7,
+                bbox=dict(boxstyle="round,pad=0.3", facecolor="#fff8e1",
+                          edgecolor="#c0392b", lw=0.8))
+
+    ax.set_title(f"Signal Mapping (Octagon) — {frame.name}  "
+                 f"(Frame ID: {frame.frame_id}, Length: {frame.length} bytes)",
+                 fontsize=13, fontweight="bold", pad=12)
+    lim = 1.5 + 0.30 * max(len(ann_items), 1)
+    ax.set_xlim(-lim, lim)
+    ax.set_ylim(-lim, lim)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+
+    plt.tight_layout()
+
+    saved = []
+    if save_png:
+        png_path = f"{output_dir}/{frame_name}_signal_mapping_octagon.png"
+        plt.savefig(png_path, dpi=dpi, bbox_inches="tight", facecolor="white")
+        saved.append(png_path)
+    if save_svg:
+        svg_path = f"{output_dir}/{frame_name}_signal_mapping_octagon.svg"
         plt.savefig(svg_path, format="svg", bbox_inches="tight", facecolor="white")
         saved.append(svg_path)
     plt.close()
@@ -384,6 +620,12 @@ def main():
     # 1. 单帧高清图
     for fname in DEFAULT_FRAMES:
         saved = plot_single_frame(ldf, fname, OUTPUT_DIR)
+        for s in saved:
+            print(f"Saved: {s}")
+
+    # 1b. 单帧八边形布局图（8边=8字节）
+    for fname in DEFAULT_FRAMES:
+        saved = plot_single_frame_octagon(ldf, fname, OUTPUT_DIR)
         for s in saved:
             print(f"Saved: {s}")
 
