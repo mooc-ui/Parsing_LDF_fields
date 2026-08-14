@@ -173,6 +173,15 @@ class LDFGui:
         tk.Checkbutton(opt_row2, text="八边形布局（8边=8字节）", variable=self.var_octagon,
                        font=("Microsoft YaHei", 9), bg=BG).pack(side="left", padx=(0, 12))
 
+        opt_row3 = tk.Frame(bottom, bg=BG)
+        opt_row3.pack(fill="x", pady=2)
+        tk.Label(opt_row3, text="八边形纸张方向:", font=("Microsoft YaHei", 9), bg=BG).pack(side="left")
+        self.var_paper = tk.StringVar(value="landscape")
+        tk.Radiobutton(opt_row3, text="横向 (A4 Landscape)", variable=self.var_paper,
+                       value="landscape", font=("Microsoft YaHei", 9), bg=BG).pack(side="left", padx=(8, 12))
+        tk.Radiobutton(opt_row3, text="纵向 (A4 Portrait)", variable=self.var_paper,
+                       value="portrait", font=("Microsoft YaHei", 9), bg=BG).pack(side="left")
+
         # 生成按钮
         self.btn_generate = tk.Button(self.root, text="生成", command=self._generate,
                                       font=("Microsoft YaHei", 12, "bold"), bg="#2e7d32",
@@ -381,7 +390,8 @@ class LDFGui:
                         saved = parse.plot_single_frame_octagon(
                             self.ldf, fname, outdir,
                             save_png=self.var_png.get(), save_svg=self.var_svg.get(),
-                            annotations=ann or None)
+                            annotations=ann or None,
+                            paper=self.var_paper.get())
                         for s in saved:
                             self._log(f"Saved: {s}")
 

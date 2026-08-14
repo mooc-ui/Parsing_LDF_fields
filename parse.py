@@ -412,7 +412,7 @@ def _octagon_name_extent(ax, signals, OFF):
 
 
 def plot_single_frame_octagon(ldf, frame_name, output_dir=OUTPUT_DIR, save_png=True, save_svg=True,
-                              dpi=300, annotations=None):
+                              dpi=300, annotations=None, paper="landscape"):
     """绘制八边形布局单帧图（8条边=8字节，每条边8 bit，中心区帧信息）
 
     规则：
@@ -420,6 +420,8 @@ def plot_single_frame_octagon(ldf, frame_name, output_dir=OUTPUT_DIR, save_png=T
     - 帧长 < 8 字节时，空余边以虚线 + "Reserved" 标记
     - 跨字节信号拆分为多段分别绘于各字节边，段间用弧线连接
     - 注释以引线+文本框绘制在八边形外侧（沿信号径向）
+    paper: "landscape"(A4 横向, 默认) 或 "portrait"(A4 纵向)；仅改变纸张方向，
+           八边形/注释列表的相对布局不变
     """
     from matplotlib.patches import FancyArrowPatch
 
@@ -448,13 +450,19 @@ def plot_single_frame_octagon(ldf, frame_name, output_dir=OUTPUT_DIR, save_png=T
     LABEL_R = OFF + W + 0.10   # Reserved 标签半径（外侧）
     BYTE_LABEL_R = 0.20        # 字节标签内偏移（向中心，避开径向信号名文字）
 
-    # A4 横向画布：左侧八边形（数据坐标），右侧注释列表（归一化坐标）
-    fig = plt.figure(figsize=(11.69, 8.27))          # A4 landscape
+    # A4 纸张：横向(landscape, 默认) = 八边形左 + 注释列表右；
+    #          纵向(portrait) = 八边形上 + 注释列表下（相对布局比例不变）
+    if paper == "portrait":
+        fig = plt.figure(figsize=(8.27, 11.69))          # A4 portrait
+        ax = fig.add_axes([0.06, 0.42, 0.88, 0.54])      # 八边形区（上部）
+        ax_ann = fig.add_axes([0.06, 0.02, 0.88, 0.36])  # 注释列表区（下部）
+    else:
+        fig = plt.figure(figsize=(11.69, 8.27))          # A4 landscape
+        ax = fig.add_axes([0.01, 0.04, 0.46, 0.92])      # 八边形区
+        ax_ann = fig.add_axes([0.50, 0.04, 0.49, 0.92])  # 注释列表区
     fig.patch.set_facecolor("white")
-    ax = fig.add_axes([0.01, 0.04, 0.46, 0.92])      # 八边形区
     ax.set_facecolor("#fafafa")
     ax.set_aspect("equal")
-    ax_ann = fig.add_axes([0.50, 0.04, 0.49, 0.92])  # 注释列表区
     ax_ann.set_xlim(0, 1)
     ax_ann.set_ylim(0, 1)
     ax_ann.set_xticks([])
