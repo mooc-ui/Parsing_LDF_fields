@@ -220,13 +220,132 @@ def _split_byte_segments(sig):
     return segs
 
 
-def _rect_overlap(rect, placed):
-    """判断轴对齐矩形 rect 是否与已放置矩形列表 placed 中任意一个重叠"""
-    ax0, ay0, ax1, ay1 = rect
-    for bx0, by0, bx1, by1 in placed:
-        if ax0 < bx1 and ax1 > bx0 and ay0 < by1 and ay1 > by0:
-            return True
-    return False
+def _measure_text_plain_r(ax, text, fs, renderer):
+    """测量文本（无边框）宽度，单位：axes 归一化坐标（0~1）。
+
+    使用已获取的 renderer 直接计算窗口尺寸，不触发整图重绘，速度快。
+    """
+    t = ax.text(0, 0, text, ha="left", va="center", fontsize=fs)
+    bb = t.get_window_extent(renderer=renderer)
+    inv = ax.transData.inverted()
+    x0, _ = inv.transform((bb.x0, bb.y0))
+    x1, _ = inv.transform((bb.x1, bb.y1))
+    t.remove()
+    return x1 - x0
+
+
+def _layout_octagon_annotation_list(ax, ann_items, sig_colors, fs_start=10.0, y_top=0.94):
+    """注释列表式布局：右侧区域从上到下一条条顺序排列，放不下自动分列。
+
+    每条注释 = 色块 + 加粗信号名(独立一行) + 注释文本(缩进换行)，
+    无论名称多长都不会横向越界/与相邻条目重叠。
+    ax: 归一化坐标(0~1)的注释区 axes
+    返回 (entries, fs, line_h)：
+      - entries: [(sig, name, name_w, text_lines, x, y, h, color)]
+      - line_h: 单行行距（归一化高度）
+    """
+    renderer = ax.figure.canvas.get_renderer()
+    # 单行高度（归一化）
+    t = ax.text(0, 0, "中", fontsize=fs_start, ha="left", va="center")
+    bb = t.get_window_extent(renderer=renderer)
+    inv = ax.transData.inverted()
+    y0 = inv.transform((bb.x0, bb.y0))[1]
+    y1 = inv.transform((bb.x0, bb.y1))[1]
+    t.remove()
+    base_line = y1 - y0
+
+    def wrap_to_avail(text, avail, fs):
+        lines = []
+        cur = ""
+        for ch in text:
+            test = cur + ch
+            if cur and _measure_text_plain_r(ax, test, fs, renderer) > avail:
+                lines.append(cur)
+                cur = ch
+            else:
+                cur = test
+        if cur:
+            lines.append(cur)
+        return lines
+
+    best = None   # (max_col_h, fs, n_cols, col_xs, col_items)
+    for fs in (fs_start, fs_start - 1.0, fs_start - 2.0, fs_start - 3.0):
+        line_h = base_line * (fs / fs_start) * 1.45
+        gap = base_line * (fs / fs_start) * 0.6
+        for n_cols in (1, 2, 3, 4):
+            col_w = 0.94 if n_cols == 1 else (0.455 if n_cols == 2
+                                              else (0.30 if n_cols == 3 else 0.225))
+            col_xs = [0.02, 0.52, 0.68, 0.76][:n_cols]
+            indent = 0.035             # 文本相对名称缩进
+            avail = col_w - indent - 0.02
+            if avail < base_line * 0.5:   # 列太窄放不下任何字 → 换更大列数/更小字号
+                continue
+            rows = []
+            for sig, text in ann_items:
+                name = sig["name"] + ": "
+                name_w = _measure_text_plain_r(ax, name, fs, renderer)
+                # 名称独立一行：若名称超宽则按列宽换行（保证不横向越界）
+                if name_w > col_w - 0.02:
+                    name_lines = wrap_to_avail(name, col_w - 0.02, fs)
+                    name_w = col_w - 0.02
+                    disp_name = name_lines[0]
+                else:
+                    disp_name = name
+                lines = wrap_to_avail(text, avail, fs)
+                h = (1 + len(lines)) * line_h + gap
+                rows.append((sig, disp_name, name_w, lines, h))
+            # 贪心分配列：依次放入当前最矮列
+            col_h = [0.0] * n_cols
+            col_items = [[] for _ in range(n_cols)]
+            for row in rows:
+                ci = min(range(n_cols), key=lambda i: col_h[i])
+                col_items[ci].append(row)
+                col_h[ci] += row[4]
+            mh = max(col_h)
+            if mh <= 0.94:
+                entries = []
+                for ci in range(n_cols):
+                    y = y_top
+                    for sig, name, name_w, lines, h in col_items[ci]:
+                        entries.append((sig, name, name_w, lines,
+                                        col_xs[ci], y, h,
+                                        sig_colors.get(sig["name"], "#888")))
+                        y -= h
+                return entries, fs, line_h
+            if best is None or mh < best[0]:
+                best = (mh, fs, n_cols, col_xs, col_items)
+    # 极端情况兜底：取高度最小方案，保证文本换行完整（不重叠）
+    _, fs, n_cols, col_xs, col_items = best
+    line_h = base_line * (fs / fs_start) * 1.45
+    entries = []
+    for ci in range(n_cols):
+        y = y_top
+        for sig, name, name_w, lines, h in col_items[ci]:
+            entries.append((sig, name, name_w, lines,
+                            col_xs[ci], y, h,
+                            sig_colors.get(sig["name"], "#888")))
+            y -= h
+    return entries, fs, line_h
+
+
+def _draw_octagon_annotation_list(ax, entries, fs, line_h):
+    """绘制注释列表条目：色块 + 加粗信号名(首行) + 注释文本(从第二行缩进)"""
+    sw = line_h * 0.55
+    for sig, name, name_w, lines, x, y, h, color in entries:
+        # 色块（位于条目顶部行，垂直居中于名称行）
+        ax.add_patch(Rectangle((x, y + line_h * 0.35 - sw), sw, sw,
+                               transform=ax.transAxes,
+                               facecolor=color, edgecolor="#333", lw=0.4, zorder=6))
+        tx = x + sw + 0.02
+        # 信号名（加粗，首行）
+        ax.text(tx, y, name, ha="left", va="top", fontsize=fs,
+                fontweight="bold", color="#111", transform=ax.transAxes, zorder=7)
+        # 注释文本：从第二行起缩进（不与名称重叠）
+        yy = y + line_h
+        for ln in lines:
+            ax.text(tx + 0.02, yy, ln, ha="left", va="top", fontsize=fs,
+                    color="#333", transform=ax.transAxes, zorder=7)
+            yy += line_h
 
 
 def _measure_text(ax, text, fs):
@@ -247,84 +366,49 @@ def _measure_text(ax, text, fs):
     return x1 - x0, y1 - y0
 
 
-def _layout_octagon_annotations(ax, ann_items, verts, byte_edges, OFF, W, lim):
-    """八边形注释防重叠布局（基于实际渲染尺寸测量）
+def _measure_text_plain(ax, text, fs):
+    """测量文本（无边框）在数据坐标系中的实际渲染宽度 w"""
+    fig = ax.figure
+    inv = ax.transData.inverted()
+    t = ax.text(0, 0, text, ha="left", va="center", fontsize=fs)
+    fig.canvas.draw()
+    bb = t.get_window_extent(renderer=fig.canvas.get_renderer())
+    x0, _ = inv.transform((bb.x0, bb.y0))
+    x1, _ = inv.transform((bb.x1, bb.y1))
+    t.remove()
+    return x1 - x0
 
-    沿各信号径向放置注释框，用碰撞检测（半径递增 × 切向偏移）搜索无重叠位置；
-    同时避开该信号自身的名称文字（名称沿径向从块内边缘向外延伸）。
-    返回 ([(sig, wrapped, cx, cy)], 最大外接半径)。
+
+def _name_fontsize(name_len):
+    """信号名字号分档：保证 A4 打印清晰（最小 4.7pt）"""
+    if name_len <= 12:
+        return 7.0
+    elif name_len <= 20:
+        return 6.3
+    elif name_len <= 28:
+        return 5.5
+    else:
+        return 4.7
+
+
+def _octagon_name_extent(ax, signals, OFF):
+    """测所有信号名沿径向外伸的最大半径（数据单位）
+
+    名字沿径向书写（长轴=径向），水平测量宽度即径向外伸长度。
     """
-    placed = []          # 已放置文本框矩形
-    out = []
-    base_r, r_step = 0.5, 0.14
-    max_r = lim * 0.90
-    t_offs = (0.0, 0.18, -0.18, 0.36, -0.36, 0.54, -0.54, 0.72, -0.72,
-              0.90, -0.90, 1.08, -1.08, 1.44, -1.44, 1.80, -1.80)
-    max_ext = 0.0
-
-    for sig, text in ann_items:
+    verts, byte_edges = _octagon_geometry()
+    max_r = OFF
+    for sig in signals:
         segs = _split_byte_segments(sig)
         b, j0, j1 = segs[0]
-        t0, t1 = j0 / 8, (j1 + 1) / 8
-        cmid = (t0 + t1) / 2
+        cmid = (j0 / 8 + (j1 + 1) / 8) / 2
         mx, my = _octagon_edge_point(verts, byte_edges, b, cmid)
         nx, ny = _octagon_outward(verts, byte_edges, b)
-        anchor = (mx + nx * (OFF + W), my + ny * (OFF + W))
-        L = math.hypot(anchor[0], anchor[1])
-        ux, uy = anchor[0] / L, anchor[1] / L
-        # 切向单位向量（沿字节边方向，用于切向错开）
-        ks, ke = byte_edges[b]
-        tx, ty = verts[ke][0] - verts[ks][0], verts[ke][1] - verts[ks][1]
-        tl = math.hypot(tx, ty)
-        tx /= tl
-        ty /= tl
-
-        # 文本换行
-        wrap_w = 22 if any('\u4e00' <= ch <= '\u9fff' for ch in text) else 40
-        wrapped = "\n".join(textwrap.wrap(text, wrap_w)) or text
-        # 实际渲染尺寸（数据单位，含边框）
-        w, h = _measure_text(ax, wrapped, 7.0)
-
-        # 自身信号名占用的径向外端（名称锚定块内边缘、沿径向向外延伸）
-        ln = len(sig["name"])
-        if ln <= 12:
-            nfs = 6.5
-        elif ln <= 20:
-            nfs = 5.8
-        elif ln <= 28:
-            nfs = 5.0
-        else:
-            nfs = 4.2
-        name_len, _ = _measure_text(ax, sig["name"], nfs)
-        name_outer = (mx + nx * (OFF + name_len), my + ny * (OFF + name_len))
-        name_outer_dist = math.hypot(name_outer[0], name_outer[1])
-        min_r = name_outer_dist + 0.12 + h / 2 - L
-
-        # 搜索无重叠位置：半径递增 × 切向偏移
-        pos = None
-        for i in range(40):
-            r = base_r + i * r_step
-            if r > max_r:
-                break
-            if r < min_r:
-                continue
-            for t_off in t_offs:
-                cx = anchor[0] + ux * r + tx * t_off
-                cy = anchor[1] + uy * r + ty * t_off
-                rect = (cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2)
-                if not _rect_overlap(rect, placed):
-                    pos = (cx, cy, rect)
-                    break
-            if pos is not None:
-                break
-        if pos is None:   # 兜底：放在基础位置
-            cx = anchor[0] + ux * base_r
-            cy = anchor[1] + uy * base_r
-            pos = (cx, cy, (cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2))
-        placed.append(pos[2])
-        max_ext = max(max_ext, abs(pos[0]) + w / 2, abs(pos[1]) + h / 2)
-        out.append((sig, wrapped, pos[0], pos[1]))
-    return out, max_ext
+        fs = _name_fontsize(len(sig["name"]))
+        name_len = _measure_text_plain(ax, sig["name"], fs)
+        r = math.hypot(mx + nx * (OFF + name_len), my + ny * (OFF + name_len))
+        max_r = max(max_r, r)
+    return max_r
 
 
 def plot_single_frame_octagon(ldf, frame_name, output_dir=OUTPUT_DIR, save_png=True, save_svg=True,
@@ -364,9 +448,34 @@ def plot_single_frame_octagon(ldf, frame_name, output_dir=OUTPUT_DIR, save_png=T
     LABEL_R = OFF + W + 0.10   # Reserved 标签半径（外侧）
     BYTE_LABEL_R = 0.20        # 字节标签内偏移（向中心，避开径向信号名文字）
 
-    fig, ax = plt.subplots(figsize=(9, 9))
+    # A4 横向画布：左侧八边形（数据坐标），右侧注释列表（归一化坐标）
+    fig = plt.figure(figsize=(11.69, 8.27))          # A4 landscape
+    fig.patch.set_facecolor("white")
+    ax = fig.add_axes([0.01, 0.04, 0.46, 0.92])      # 八边形区
     ax.set_facecolor("#fafafa")
     ax.set_aspect("equal")
+    ax_ann = fig.add_axes([0.50, 0.04, 0.49, 0.92])  # 注释列表区
+    ax_ann.set_xlim(0, 1)
+    ax_ann.set_ylim(0, 1)
+    ax_ann.set_xticks([])
+    ax_ann.set_yticks([])
+    for spine in ax_ann.spines.values():
+        spine.set_visible(False)
+
+    # 画幅自适应：信号名沿径向延伸，lim 由名称最大外伸决定
+    # （字号固定 → 数据单位随变换缩放，与 lim 相互依赖 → 迭代收敛）
+    lim = 1.6
+    for _ in range(10):
+        ax.set_xlim(-lim, lim)
+        ax.set_ylim(-lim, lim)
+        ext = _octagon_name_extent(ax, signals, OFF)
+        new_lim = max(1.6, ext + 0.15)
+        if abs(new_lim - lim) < 0.02:
+            lim = new_lim
+            break
+        lim = new_lim
+    ax.set_xlim(-lim, lim)
+    ax.set_ylim(-lim, lim)
 
     # 八边形外轮廓（浅灰填充）
     poly = Polygon(verts, closed=True, facecolor="#f2f4f7", edgecolor="#555",
@@ -384,7 +493,7 @@ def plot_single_frame_octagon(ldf, frame_name, output_dir=OUTPUT_DIR, save_png=T
                     linestyle=(0, (4, 3)), zorder=2)
             mx, my = _octagon_edge_point(verts, byte_edges, b, 0.5)
             ax.text(mx + nx * LABEL_R, my + ny * LABEL_R, "Reserved",
-                    ha="center", va="center", fontsize=6.5, color="#999",
+                    ha="center", va="center", fontsize=7.5, color="#999",
                     fontstyle="italic", zorder=6)
             continue
         for j in range(1, 8):
@@ -402,7 +511,7 @@ def plot_single_frame_octagon(ldf, frame_name, output_dir=OUTPUT_DIR, save_png=T
             ang += 180
         ax.text(mx - nx * BYTE_LABEL_R, my - ny * BYTE_LABEL_R,
                 f"B{b} [{b * 8}-{b * 8 + 7}]", ha="center", va="center",
-                rotation=ang, fontsize=6.5, fontweight="bold", color="#333",
+                rotation=ang, fontsize=7.5, fontweight="bold", color="#333",
                 zorder=6, bbox=dict(boxstyle="round,pad=0.15", facecolor="white",
                                     edgecolor="#aaa", lw=0.5))
 
@@ -438,15 +547,7 @@ def plot_single_frame_octagon(ldf, frame_name, output_dir=OUTPUT_DIR, save_png=T
                 ha = "right" if nx < 0 else "left"
                 # 字号按名称长度分档：径向文字沿垂直边书写（长轴=径向），
                 # 不受沿边 seg_len 限制，始终显示完整名称、足够大
-                ln = len(sig["name"])
-                if ln <= 12:
-                    fs = 6.5
-                elif ln <= 20:
-                    fs = 5.8
-                elif ln <= 28:
-                    fs = 5.0
-                else:
-                    fs = 4.2
+                fs = _name_fontsize(len(sig["name"]))
                 # 锚点 = 信号块内边缘(径向 OFF)；rotation_mode="anchor" 使文字
                 # 从锚点起只沿阅读方向延伸(ha=left 向前 / ha=right 向后=外法向)，
                 # 保证信号名只位于八边形外侧、绝不越过八边形边
@@ -479,64 +580,42 @@ def plot_single_frame_octagon(ldf, frame_name, output_dir=OUTPUT_DIR, save_png=T
     center = Circle((0, 0), 0.52, facecolor="white", edgecolor="#555",
                     linewidth=1.0, zorder=7)
     ax.add_patch(center)
-    ax.text(0, 0.16, frame.name, ha="center", va="center", fontsize=10,
+    ax.text(0, 0.16, frame.name, ha="center", va="center", fontsize=11,
             fontweight="bold", color="#111", zorder=8)
     ax.text(0, -0.02, f"ID: {frame.frame_id}", ha="center", va="center",
-            fontsize=7.5, color="#333", zorder=8)
+            fontsize=8.5, color="#333", zorder=8)
     ax.text(0, -0.18, f"{n_bytes} B / {total_bits} bit", ha="center", va="center",
-            fontsize=7.5, color="#555", zorder=8)
+            fontsize=8.5, color="#555", zorder=8)
 
-    # ===== 注释布局：引线 + 外圈文本框（碰撞检测防重叠） =====
-    # 先固定标题与画布布局，使文本测量的坐标变换稳定；
-    # 画幅 lim 与文本框尺寸互相依赖，迭代收敛
-    ax.set_title(f"Signal Mapping (Octagon) — {frame.name}  "
-                 f"(Frame ID: {frame.frame_id}, Length: {frame.length} bytes)",
-                 fontsize=13, fontweight="bold", pad=12)
-    plt.tight_layout()
+    # ===== 注释布局：右侧列表式（一条条顺序往下排列，自动分列） =====
+    # 注释区独立于八边形区，远离信号名，天然不重叠
+    if ann_items:
+        sig_colors = {}
+        for i, sig in enumerate(signals):
+            sig_colors[sig["name"]] = cmap(i / max(len(signals) - 1, 1))
+        ax_ann.text(0.02, 0.975, "信号注释", fontsize=13, fontweight="bold",
+                    color="#111", transform=ax_ann.transAxes)
+        entries, ann_fs, line_h = _layout_octagon_annotation_list(
+            ax_ann, ann_items, sig_colors, fs_start=10.0, y_top=0.93)
+        _draw_octagon_annotation_list(ax_ann, entries, ann_fs, line_h)
 
-    lim = 1.5 + 0.30 * max(len(ann_items), 1)
-    ann_layout = []
-    for _ in range(6):
-        ax.set_xlim(-lim, lim)
-        ax.set_ylim(-lim, lim)
-        ann_layout, max_ext = _layout_octagon_annotations(ax, ann_items, verts, byte_edges, OFF, W, lim)
-        new_lim = max(lim, max_ext + 0.35)
-        if new_lim <= lim * 1.005:
-            lim = new_lim
-            break
-        lim = new_lim
-    else:
-        lim = max(lim, max_ext + 0.35)
-
-    for sig, wrapped, cx, cy in ann_layout:
-        segs = _split_byte_segments(sig)
-        b, j0, j1 = segs[0]
-        t0, t1 = j0 / 8, (j1 + 1) / 8
-        cmid = (t0 + t1) / 2
-        mx, my = _octagon_edge_point(verts, byte_edges, b, cmid)
-        nx, ny = _octagon_outward(verts, byte_edges, b)
-        anchor = (mx + nx * (OFF + W), my + ny * (OFF + W))
-        # 引线：从信号块外边缘到注释框中心
-        ax.plot([anchor[0], cx], [anchor[1], cy], color="#c0392b", lw=0.9, zorder=6)
-        ax.text(cx, cy, wrapped, ha="center", va="center", fontsize=7, color="#222",
-                zorder=7, bbox=dict(boxstyle="round,pad=0.3", facecolor="#fff8e1",
-                                    edgecolor="#c0392b", lw=0.8))
-
-    ax.set_xlim(-lim, lim)
-    ax.set_ylim(-lim, lim)
     ax.set_xticks([])
     ax.set_yticks([])
     for spine in ax.spines.values():
         spine.set_visible(False)
 
+    fig.suptitle(f"Signal Mapping (Octagon) — {frame.name}  "
+                 f"(Frame ID: {frame.frame_id}, Length: {frame.length} bytes)",
+                 fontsize=15, fontweight="bold", y=0.985)
+
     saved = []
     if save_png:
         png_path = f"{output_dir}/{frame_name}_signal_mapping_octagon.png"
-        plt.savefig(png_path, dpi=dpi, bbox_inches="tight", facecolor="white")
+        plt.savefig(png_path, dpi=dpi, facecolor="white")
         saved.append(png_path)
     if save_svg:
         svg_path = f"{output_dir}/{frame_name}_signal_mapping_octagon.svg"
-        plt.savefig(svg_path, format="svg", bbox_inches="tight", facecolor="white")
+        plt.savefig(svg_path, format="svg", facecolor="white")
         saved.append(svg_path)
     plt.close()
     return saved
