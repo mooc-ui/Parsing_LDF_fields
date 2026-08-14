@@ -282,7 +282,8 @@ def _layout_octagon_annotation_list(ax, ann_items, sig_colors, fs_start=10.0, y_
                 continue
             rows = []
             for sig, text in ann_items:
-                name = sig["name"] + ": "
+                # 名称行 = 信号名 + bit 范围（从哪一bit到哪一bit）
+                name = f"{sig['name']}  [bit {sig['start']}-{sig['end']}]"
                 name_w = _measure_text_plain_r(ax, name, fs, renderer)
                 # 名称独立一行：若名称超宽则按列宽换行（保证不横向越界）
                 if name_w > col_w - 0.02:
@@ -509,14 +510,24 @@ def plot_single_frame_octagon(ldf, frame_name, output_dir=OUTPUT_DIR, save_png=T
             ax.plot([px + nx * (OFF - 0.02), px + nx * (OFF + W + 0.02)],
                     [py + ny * (OFF - 0.02), py + ny * (OFF + W + 0.02)],
                     color="#666", lw=0.6, zorder=3)
-        # 字节标签（放内侧靠近中心圆，避开径向信号名文字）
-        mx, my = _octagon_edge_point(verts, byte_edges, b, 0.5)
+        # 字节标签的旋转角（沿边方向）
         ks, ke = byte_edges[b]
         dx = verts[ke][0] - verts[ks][0]
         dy = verts[ke][1] - verts[ks][1]
         ang = math.degrees(math.atan2(dy, dx))
         if ang > 90 or ang < -90:
             ang += 180
+        # bit 标注：位于八边形边与信号块之间的间隙（径向偏移 = OFF/2），
+        # 沿边方向书写，byte b 对应 bit b*8 ~ b*8+7
+        BIT_LABEL_R = OFF * 0.5
+        for j in range(8):
+            bit_no = b * 8 + j
+            px, py = _octagon_edge_point(verts, byte_edges, b, (j + 0.5) / 8)
+            ax.text(px + nx * BIT_LABEL_R, py + ny * BIT_LABEL_R,
+                    str(bit_no), ha="center", va="center",
+                    rotation=ang, fontsize=5.0, color="#666", zorder=6)
+        # 字节标签（放内侧靠近中心圆，避开径向信号名文字）
+        mx, my = _octagon_edge_point(verts, byte_edges, b, 0.5)
         ax.text(mx - nx * BYTE_LABEL_R, my - ny * BYTE_LABEL_R,
                 f"B{b} [{b * 8}-{b * 8 + 7}]", ha="center", va="center",
                 rotation=ang, fontsize=7.5, fontweight="bold", color="#333",
