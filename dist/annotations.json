@@ -1,0 +1,15 @@
+{
+  "ST_FAN_1_LIN": {
+    "AVL_U_FAN_1_LIN": "测试中文注释",
+    "ST_ERR_TEMP_FAN_1_LIN": "转速下发，转化是raw*0.4",
+    "ST_ERR_I_SWO_FAN_1_LIN": "转速下发，转化是raw*0.4qwwwqq",
+    "ST_ERR_I_OFFS_FAN_1_LIN": "转速下发，转化是raw*0.4wedqewffffff",
+    "ST_ERR_U_IPLB_FAN_1_LIN": "转速下发，转化是raw*0.42w1qweqadaddd",
+    "ST_ERR_GND_LSS_FAN_1_LIN": "转速下发，转化是raw*0.4qweqdwqdrrerrr",
+    "ST_ERR_BLK_FAN_1_LIN": "转速下发，转化是raw*0.4q2ww123124321",
+    "ST_ERR_SLU_FAN_1_LIN": "转速下发，转化是raw*0.4zsxcvvbbbb"
+  },
+  "CTR_FAN_LIN": {
+    "TARVL_V_FAN_1_LIN": "转速下发，转化是raw*0.4"
+  }
+}

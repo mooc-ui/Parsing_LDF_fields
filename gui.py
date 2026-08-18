@@ -8,6 +8,7 @@ LIN LDF Signal Mapping Visualizer - GUI
 import json
 import os
 import queue
+import sys
 import threading
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
@@ -17,7 +18,17 @@ import parse
 APP_TITLE = "LIN Signal Mapping Generator"
 BG = "#f5f6f8"
 ACCENT = "#1f4e79"
-ANN_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "annotations.json")
+
+
+def _app_dir():
+    """exe(冻结)运行时返回 exe 所在目录；源码运行时返回脚本所在目录"""
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+APP_DIR = _app_dir()
+ANN_FILE = os.path.join(APP_DIR, "annotations.json")
 
 
 class LDFGui:
@@ -39,9 +50,12 @@ class LDFGui:
         # 启动消息轮询（后台线程 → UI 线程）
         self.root.after(100, self._poll_queue)
 
-        # 若默认 LDF 存在则自动加载
-        if os.path.exists(parse.LDF_PATH):
-            self._load_ldf(parse.LDF_PATH)
+        # 若默认 LDF 存在则自动加载（exe 旁优先，其次工作目录）
+        default_ldf = os.path.join(APP_DIR, os.path.basename(parse.LDF_PATH))
+        if not os.path.exists(default_ldf):
+            default_ldf = parse.LDF_PATH
+        if os.path.exists(default_ldf):
+            self._load_ldf(default_ldf)
 
     # ==================== UI 构建 ====================
     def _build_ui(self):

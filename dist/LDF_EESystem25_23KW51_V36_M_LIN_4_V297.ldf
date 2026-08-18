@@ -1,0 +1,416 @@
+/*  QGate V5.12.1 - 17.12.23 12:37:07 MEZ*/ 
+/* ************************************************************************** */
+/*                                                                            */
+/*                    	         BMW AG                                       */
+/*                        All rights reserved                                 */
+/*                                                                            */
+/* ************************************************************************** */
+/*                                                                            */
+/*  Description: LIN Description file                                         */
+/*  Distribution: J23KW51                                                     */
+/*  Konfiguration: EESystem25_23KW51 [36]                                     */
+/*  Konfigurationsstand: G065-26-07-250                                       */
+/*  Bus: M_LIN_4 [297]                                                        */
+/*                                                                            */
+/* ************************************************************************** */
+
+LIN_description_file;
+LIN_protocol_version = "2.2";
+LIN_language_version = "2.2";
+LIN_speed =  19.2 kbps;
+Channel_name = "M_LIN_4";
+
+Nodes {
+	Master: DME1, 10.0 ms, 0.1 ms;
+	Slaves: DV_Batt48, FAN_1;
+}
+
+Signals {
+	AVL_I_FAN_1_LIN: 8, 255, FAN_1, DME1;
+	AVL_OPMO_FAN_1_LIN: 3, 7, FAN_1, DME1;
+	AVL_RPM_FAN_1_LIN: 8, 255, FAN_1, DME1;
+	AVL_TEMP_FAN_1_LIN: 8, 255, FAN_1, DME1;
+	AVL_U_FAN_1_LIN: 8, 255, FAN_1, DME1;
+	CommErrorDVBatt48LIN: 1, 0, DV_Batt48, DME1;
+	COMM_ERR_FAN_1_LIN: 1, 0, FAN_1, DME1;
+	ControlCalibrationDVBatt48LIN: 2, 0, DME1, DV_Batt48;
+	ControlPositionDVBatt48LIN: 12, 0, DME1, DV_Batt48;
+	DataDiagnosis1DVBatt48LIN: 4, 15, DV_Batt48, DME1;
+	DataDiagnosis2DVBatt48LIN: 16, 65535, DV_Batt48, DME1;
+	HeartbeatDVBatt48LIN: 3, 7, DV_Batt48, DME1;
+	SporadicDummySignal: 8, 255, DME1, FAN_1;
+	StatusCalibrationRunDVBatt48LIN: 2, 3, DV_Batt48, DME1;
+	StatusPositionDVBatt48LIN: 12, 4095, DV_Batt48, DME1;
+	StErrLdSupyVRASpecFan1Lin: 2, 3, FAN_1, DME1;
+	ST_ERR_BLK_FAN_1_LIN: 2, 3, FAN_1, DME1;
+	ST_ERR_BRI_FAN_1_LIN: 2, 3, FAN_1, DME1;
+	ST_ERR_BRI_SC_FAN_1_LIN: 2, 3, FAN_1, DME1;
+	ST_ERR_FAN_1_LIN: 2, 3, FAN_1, DME1;
+	ST_ERR_GND_LSS_FAN_1_LIN: 2, 3, FAN_1, DME1;
+	ST_ERR_I_FAN_1_LIN: 2, 3, FAN_1, DME1;
+	ST_ERR_I_OFFS_FAN_1_LIN: 2, 3, FAN_1, DME1;
+	ST_ERR_I_SWO_FAN_1_LIN: 2, 3, FAN_1, DME1;
+	ST_ERR_LD_SUPY_IPLB_FAN_1_LIN: 2, 3, FAN_1, DME1;
+	ST_ERR_SLU_FAN_1_LIN: 2, 3, FAN_1, DME1;
+	ST_ERR_TEMP_FAN_1_LIN: 2, 3, FAN_1, DME1;
+	ST_ERR_TEMP_SWO_FAN_1_LIN: 2, 3, FAN_1, DME1;
+	ST_ERR_U_IPLB_FAN_1_LIN: 2, 3, FAN_1, DME1;
+	TARVL_T_FAN_1_LIN: 8, 255, DME1, FAN_1;
+	TARVL_V_FAN_1_LIN: 8, 255, DME1, FAN_1;
+	TAR_OPMO_FAN_1_LIN: 3, 7, DME1, FAN_1;
+	ZeroPositionDVBatt48LIN: 2, 3, DME1, DV_Batt48;
+}
+
+Diagnostic_signals {
+	MasterReqB0: 8, 0;
+	MasterReqB1: 8, 0;
+	MasterReqB2: 8, 0;
+	MasterReqB3: 8, 0;
+	MasterReqB4: 8, 0;
+	MasterReqB5: 8, 0;
+	MasterReqB6: 8, 0;
+	MasterReqB7: 8, 0;
+	SlaveRespB0: 8, 0;
+	SlaveRespB1: 8, 0;
+	SlaveRespB2: 8, 0;
+	SlaveRespB3: 8, 0;
+	SlaveRespB4: 8, 0;
+	SlaveRespB5: 8, 0;
+	SlaveRespB6: 8, 0;
+	SlaveRespB7: 8, 0;
+}
+
+Frames {
+	ControlThreeWayValveBatt48LIN: 54, DME1, 2{
+		ControlPositionDVBatt48LIN, 0;
+		ZeroPositionDVBatt48LIN, 12;
+		ControlCalibrationDVBatt48LIN, 14;
+	}
+	CTR_FAN_LIN: 3, DME1, 8{
+		TARVL_V_FAN_1_LIN, 0;
+		TARVL_T_FAN_1_LIN, 8;
+		TAR_OPMO_FAN_1_LIN, 16;
+	}
+	SporadicDummyFrame: 59, DME1, 4{
+		SporadicDummySignal, 0;
+	}
+	StatusThreeWayValveBatt48LIN: 48, DV_Batt48, 8{
+		StatusPositionDVBatt48LIN, 0;
+		DataDiagnosis1DVBatt48LIN, 12;
+		StatusCalibrationRunDVBatt48LIN, 16;
+		HeartbeatDVBatt48LIN, 18;
+		CommErrorDVBatt48LIN, 23;
+		DataDiagnosis2DVBatt48LIN, 24;
+	}
+	ST_FAN_1_LIN: 4, FAN_1, 8{
+		AVL_RPM_FAN_1_LIN, 0;
+		AVL_TEMP_FAN_1_LIN, 8;
+		AVL_I_FAN_1_LIN, 16;
+		AVL_U_FAN_1_LIN, 24;
+		ST_ERR_BRI_FAN_1_LIN, 32;
+		ST_ERR_BRI_SC_FAN_1_LIN, 34;
+		ST_ERR_TEMP_FAN_1_LIN, 36;
+		ST_ERR_TEMP_SWO_FAN_1_LIN, 38;
+		ST_ERR_I_SWO_FAN_1_LIN, 40;
+		ST_ERR_I_OFFS_FAN_1_LIN, 42;
+		ST_ERR_U_IPLB_FAN_1_LIN, 44;
+		ST_ERR_GND_LSS_FAN_1_LIN, 46;
+		ST_ERR_BLK_FAN_1_LIN, 48;
+		ST_ERR_SLU_FAN_1_LIN, 50;
+		COMM_ERR_FAN_1_LIN, 52;
+		AVL_OPMO_FAN_1_LIN, 53;
+		ST_ERR_FAN_1_LIN, 56;
+		ST_ERR_I_FAN_1_LIN, 58;
+		ST_ERR_LD_SUPY_IPLB_FAN_1_LIN, 60;
+		StErrLdSupyVRASpecFan1Lin, 62;
+	}
+}
+
+Sporadic_frames {
+	Sporadic_Frame_Holder_M_LIN_4 : SporadicDummyFrame;
+}
+
+
+Diagnostic_frames {
+	MasterReq: 60 {
+		MasterReqB0, 0;
+		MasterReqB1, 8;
+		MasterReqB2, 16;
+		MasterReqB3, 24;
+		MasterReqB4, 32;
+		MasterReqB5, 40;
+		MasterReqB6, 48;
+		MasterReqB7, 56;
+	}
+	SlaveResp: 61 {
+		SlaveRespB0, 0;
+		SlaveRespB1, 8;
+		SlaveRespB2, 16;
+		SlaveRespB3, 24;
+		SlaveRespB4, 32;
+		SlaveRespB5, 40;
+		SlaveRespB6, 48;
+		SlaveRespB7, 56;
+	}
+}
+
+Node_attributes{
+		DV_Batt48 {
+			LIN_protocol = "2.2";
+			configured_NAD = 0x0B;
+			initial_NAD = 0x0B;
+			product_id = 0x7FFF,0xFFFF,0x00;
+			response_error = CommErrorDVBatt48LIN;
+			P2_min = 50.0 ms;
+			ST_min = 0.0 ms;
+			configurable_frames {
+						ControlThreeWayValveBatt48LIN;
+						StatusThreeWayValveBatt48LIN;
+						}
+		}
+		FAN_1 {
+			LIN_protocol = "2.2";
+			configured_NAD = 0x01;
+			initial_NAD = 0x01;
+			product_id = 0x7FFF,0xFFFF,0x01;
+			response_error = COMM_ERR_FAN_1_LIN;
+			P2_min = 50.0 ms;
+			ST_min = 0.0 ms;
+			configurable_frames {
+						CTR_FAN_LIN;
+						ST_FAN_1_LIN;
+						SporadicDummyFrame;
+						}
+		}
+	}
+
+Schedule_tables {
+		DIAG { 
+			MasterReq delay 10.0 ms;
+			SlaveResp delay 10.0 ms;
+		}
+		DIAG_RESP { 
+			SlaveResp delay 10.0 ms;
+		}
+		DIAG_RQ { 
+			MasterReq delay 10.0 ms;
+		}
+		INIT_DV_Batt48 { 
+			AssignFrameIdRange { DV_Batt48 , 0, 118, 240, 0xFF, 0xFF }  delay 10.0 ms;
+		}
+		INIT_FAN_1 { 
+			AssignFrameIdRange { FAN_1 , 0, 3, 196, 251, 0xFF }  delay 10.0 ms;
+		}
+		RunSEVEvent { 
+			CTR_FAN_LIN delay 20.0 ms;
+		}
+		RUN_MAIN { 
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			ST_FAN_1_LIN delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 30.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			CTR_FAN_LIN delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 30.0 ms;
+			StatusThreeWayValveBatt48LIN delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 20.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 40.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			ControlThreeWayValveBatt48LIN delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 30.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			ST_FAN_1_LIN delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 30.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			CTR_FAN_LIN delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 20.0 ms;
+			StatusThreeWayValveBatt48LIN delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 20.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 30.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			ControlThreeWayValveBatt48LIN delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 10.0 ms;
+			Sporadic_Frame_Holder_M_LIN_4 delay 30.0 ms;
+		}
+	}
+
+Signal_encoding_types {
+		AVL_I_FAN_SigEncod {
+				physical_value, 0 , 254 , 1 , -55 , "A";
+				logical_value, 255, "信号无效"; /* @ErrorValue */
+		}
+		AVL_OPMO_FAN_2_LIN {
+				logical_value, 0, "转速调节运行已激活";
+				logical_value, 1, "自主空气密度补偿已激活";
+				logical_value, 2, "平滑启动已激活";
+				logical_value, 3, "自主风扇运行已激活";
+				logical_value, 4, "能量回收风扇运行已激活";
+				logical_value, 5, "风车运行已激活";
+				logical_value, 6, "Standby";
+				logical_value, 7, "信号未填充"; /* @ErrorValue */
+		}
+		AVL_RPM_FAN_SigEncod {
+				physical_value, 0 , 254 , 20 , 0 , "1/min";
+				logical_value, 255, "信号无效"; /* @ErrorValue */
+		}
+		AVL_TEMP_FAN_SigEncod {
+				physical_value, 0 , 254 , 1 , -55 , "°C";
+				logical_value, 255, "信号无效"; /* @ErrorValue */
+		}
+		AVL_U_FAN_SigEncod {
+				physical_value, 0 , 254 , 0.25 , 0 , "V";
+				logical_value, 255, "信号无效"; /* @ErrorValue */
+		}
+		CommErrorDVBatt48LIN {
+				logical_value, 0, "No_error";
+				logical_value, 1, "Error_active"; /* @ErrorValue */
+		}
+		COMM_ERR_SigEncod {
+				logical_value, 0, "无故障";
+				logical_value, 1, "故障已激活";
+		}
+		ControlCalibrationDVBatt48LIN {
+				logical_value, 0, "未请求校准运行";
+				logical_value, 1, "已请求校准运行";
+				logical_value, 3, "信号未填充"; /* @ErrorValue */
+		}
+		ControlPositionDVBatt48LIN {
+				physical_value, 0 , 4000 , 0.025 , 0 , "%";
+				logical_value, 4093, "功能接口不可用";
+				logical_value, 4094, "功能报告故障";
+				logical_value, 4095, "信号未填充"; /* @ErrorValue */
+		}
+		DataDiagnosis1DVBatt48LIN {
+				logical_value, 0, "Ok";
+				logical_value, 1, "故障：阀门位置无效";
+				logical_value, 2, "故障：阀门位置有效";
+				logical_value, 4, "诊断运行中";
+				logical_value, 15, "信号未填充"; /* @ErrorValue */
+		}
+		DataDiagnosis2DVBatt48LIN {
+				physical_value, 0 , 65535 , 1 , 0 , "LIN 不支持解码，请参见 NK";
+		}
+		HeartbeatDV2LIN {
+				physical_value, 0 , 6 , 1 , 0;
+				logical_value, 7, "信号未填充"; /* @ErrorValue */
+		}
+			SporadicDummySignal {
+				physical_value, 0 , 252 , 1 , 0;
+				logical_value, 255, "信号未填充"; /* @ErrorValue */
+		}
+		StatusCalibrationRunDVBatt48LIN {
+				logical_value, 0, "校准未激活";
+				logical_value, 1, "校准已激活";
+				logical_value, 3, "信号未填充"; /* @ErrorValue */
+		}
+		StatusErrorLoadSupplyVoltageRippleAboveSpecFanLin {
+				logical_value, 0, "未激活";
+				logical_value, 1, "已激活";
+				logical_value, 3, "信号未填充"; /* @ErrorValue */
+		}
+		StatusPositionDVBatt48LIN {
+				physical_value, 0 , 4000 , 0.025 , 0 , "%";
+				logical_value, 4093, "功能接口不可用";
+				logical_value, 4094, "功能报告故障";
+				logical_value, 4095, "信号未填充"; /* @ErrorValue */
+		}
+		ST_ERR_FAN_SigEncod {
+				logical_value, 0, "未激活";
+				logical_value, 1, "已激活";
+				logical_value, 3, "信号无效"; /* @ErrorValue */
+		}
+		ST_ERR_I_FAN_1_SigEncod {
+				logical_value, 0, "未激活";
+				logical_value, 1, "已激活";
+				logical_value, 3, "信号无效"; /* @ErrorValue */
+		}
+		ST_ERR_LD_SUPY_IPLB_FAN_1_LIN {
+				logical_value, 0, "未激活";
+				logical_value, 1, "已激活";
+				logical_value, 3, "信号无效"; /* @ErrorValue */
+		}
+		TARVL_T_FAN_SigEncod {
+				physical_value, 0 , 254 , 0.1 , 0 , "min";
+				logical_value, 255, "信号无效"; /* @ErrorValue */
+		}
+		TARVL_V_FAN_SigEncod {
+				physical_value, 0 , 254 , 0.4 , 0 , "%";
+				logical_value, 255, "信号无效"; /* @ErrorValue */
+		}
+		TAR_OPMO_FAN_2_SigEncod {
+				logical_value, 0, "转速调节运行已激活";
+				logical_value, 1, "自主空气密度补偿已激活";
+				logical_value, 2, "自主风扇运行已激活";
+				logical_value, 3, "能量回收已激活";
+				logical_value, 4, "平滑启动已激活";
+				logical_value, 7, "信号未填充"; /* @ErrorValue */
+		}
+		ZeroPositionDVBatt48LIN {
+				logical_value, 0, "Position_BE";
+				logical_value, 1, "Position_AE";
+				logical_value, 3, "信号未填充"; /* @ErrorValue */
+		}
+	}
+
+Signal_representation {
+		AVL_I_FAN_SigEncod: AVL_I_FAN_1_LIN;
+		AVL_OPMO_FAN_2_LIN: AVL_OPMO_FAN_1_LIN;
+		AVL_RPM_FAN_SigEncod: AVL_RPM_FAN_1_LIN;
+		AVL_TEMP_FAN_SigEncod: AVL_TEMP_FAN_1_LIN;
+		AVL_U_FAN_SigEncod: AVL_U_FAN_1_LIN;
+		CommErrorDVBatt48LIN: CommErrorDVBatt48LIN;
+		COMM_ERR_SigEncod: COMM_ERR_FAN_1_LIN;
+		ControlCalibrationDVBatt48LIN: ControlCalibrationDVBatt48LIN;
+		ControlPositionDVBatt48LIN: ControlPositionDVBatt48LIN;
+		DataDiagnosis1DVBatt48LIN: DataDiagnosis1DVBatt48LIN;
+		DataDiagnosis2DVBatt48LIN: DataDiagnosis2DVBatt48LIN;
+		HeartbeatDV2LIN: HeartbeatDVBatt48LIN;
+		SporadicDummySignal: SporadicDummySignal;
+		StatusCalibrationRunDVBatt48LIN: StatusCalibrationRunDVBatt48LIN;
+		StatusErrorLoadSupplyVoltageRippleAboveSpecFanLin: StErrLdSupyVRASpecFan1Lin;
+		StatusPositionDVBatt48LIN: StatusPositionDVBatt48LIN;
+		ST_ERR_FAN_SigEncod: ST_ERR_BLK_FAN_1_LIN,ST_ERR_BRI_FAN_1_LIN,ST_ERR_BRI_SC_FAN_1_LIN,ST_ERR_FAN_1_LIN,ST_ERR_GND_LSS_FAN_1_LIN,ST_ERR_I_OFFS_FAN_1_LIN,ST_ERR_I_SWO_FAN_1_LIN,ST_ERR_SLU_FAN_1_LIN,ST_ERR_TEMP_FAN_1_LIN,ST_ERR_TEMP_SWO_FAN_1_LIN,ST_ERR_U_IPLB_FAN_1_LIN;
+		ST_ERR_I_FAN_1_SigEncod: ST_ERR_I_FAN_1_LIN;
+		ST_ERR_LD_SUPY_IPLB_FAN_1_LIN: ST_ERR_LD_SUPY_IPLB_FAN_1_LIN;
+		TARVL_T_FAN_SigEncod: TARVL_T_FAN_1_LIN;
+		TARVL_V_FAN_SigEncod: TARVL_V_FAN_1_LIN;
+		TAR_OPMO_FAN_2_SigEncod: TAR_OPMO_FAN_1_LIN;
+		ZeroPositionDVBatt48LIN: ZeroPositionDVBatt48LIN;
+	}
+
